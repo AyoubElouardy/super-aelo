@@ -1,1 +1,423 @@
 # super-aelo
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mario-like Platformer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(to bottom, #87CEEB, #E0F7FA);
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+        
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 500px;
+        }
+        
+        #game-canvas {
+            background-color: #6B8CFF;
+            border: 4px solid #333;
+            border-radius: 6px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        #ui-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        #start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            border-radius: 6px;
+        }
+        
+        h1 {
+            font-size: 48px;
+            color: #FFD700;
+            text-shadow: 3px 3px 0 #E65100;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            background: #FF5722;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 20px;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #D84315;
+            transition: all 0.2s;
+            margin-top: 20px;
+        }
+        
+        button:hover {
+            background: #FF7043;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 0 #D84315;
+        }
+        
+        button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #D84315;
+        }
+        
+        .instructions {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            text-align: center;
+            max-width: 80%;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas" width="800" height="500"></canvas>
+        
+        <div id="ui-container">
+            <div>Score: <span id="score">0</span></div>
+            <div>Lives: <span id="lives">3</span></div>
+        </div>
+        
+        <div id="start-screen">
+            <h1>Mario-Style Platformer</h1>
+            <div class="instructions">
+                <p>Use Arrow Keys to move and Spacebar to jump</p>
+                <p>Collect coins and avoid enemies!</p>
+            </div>
+            <button id="start-button">Start Game</button>
+        </div>
+    </div>
+
+    <script>
+        // Game variables
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const livesElement = document.getElementById('lives');
+        const startScreen = document.getElementById('start-screen');
+        const startButton = document.getElementById('start-button');
+        
+        // Game state
+        let gameRunning = false;
+        let score = 0;
+        let lives = 3;
+        
+        // Player properties
+        const player = {
+            x: 50,
+            y: 400,
+            width: 40,
+            height: 60,
+            speed: 5,
+            jumpForce: 15,
+            velocityY: 0,
+            jumping: false,
+            direction: 1 // 1 for right, -1 for left
+        };
+        
+        // Platforms
+        const platforms = [
+            { x: 0, y: 460, width: 800, height: 40 },
+            { x: 200, y: 350, width: 150, height: 20 },
+            { x: 400, y: 250, width: 150, height: 20 },
+            { x: 600, y: 350, width: 150, height: 20 },
+            { x: 300, y: 150, width: 100, height: 20 }
+        ];
+        
+        // Coins
+        const coins = [
+            { x: 230, y: 320, width: 20, height: 20, collected: false },
+            { x: 430, y: 220, width: 20, height: 20, collected: false },
+            { x: 630, y: 320, width: 20, height: 20, collected: false },
+            { x: 330, y: 120, width: 20, height: 20, collected: false },
+            { x: 500, y: 400, width: 20, height: 20, collected: false }
+        ];
+        
+        // Enemies
+        const enemies = [
+            { x: 300, y: 410, width: 40, height: 40, speed: 2, direction: 1 },
+            { x: 600, y: 410, width: 40, height: 40, speed: 2, direction: -1 }
+        ];
+        
+        // Key states
+        const keys = {};
+        
+        // Event listeners
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+        
+        startButton.addEventListener('click', startGame);
+        
+        function startGame() {
+            gameRunning = true;
+            startScreen.style.display = 'none';
+            score = 0;
+            lives = 3;
+            updateScore();
+            updateLives();
+            
+            // Reset player
+            player.x = 50;
+            player.y = 400;
+            player.velocityY = 0;
+            player.jumping = false;
+            
+            // Reset coins
+            coins.forEach(coin => coin.collected = false);
+            
+            // Reset enemies
+            enemies[0].x = 300;
+            enemies[1].x = 600;
+            
+            gameLoop();
+        }
+        
+        function gameLoop() {
+            if (!gameRunning) return;
+            
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        function update() {
+            // Apply gravity
+            player.velocityY += 0.5;
+            
+            // Move player
+            if (keys['ArrowLeft']) {
+                player.x -= player.speed;
+                player.direction = -1;
+            }
+            if (keys['ArrowRight']) {
+                player.x += player.speed;
+                player.direction = 1;
+            }
+            
+            // Jump
+            if (keys[' '] && !player.jumping) {
+                player.velocityY = -player.jumpForce;
+                player.jumping = true;
+            }
+            
+            // Apply velocity
+            player.y += player.velocityY;
+            
+            // Check platform collisions
+            player.jumping = true;
+            for (const platform of platforms) {
+                if (
+                    player.x < platform.x + platform.width &&
+                    player.x + player.width > platform.x &&
+                    player.y + player.height > platform.y &&
+                    player.y + player.height <= platform.y + platform.height + player.velocityY
+                ) {
+                    player.y = platform.y - player.height;
+                    player.velocityY = 0;
+                    player.jumping = false;
+                }
+            }
+            
+            // Screen boundaries
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+            if (player.y > canvas.height) {
+                loseLife();
+                player.x = 50;
+                player.y = 400;
+                player.velocityY = 0;
+            }
+            
+            // Update enemies
+            for (const enemy of enemies) {
+                enemy.x += enemy.speed * enemy.direction;
+                
+                // Change direction if hitting edge
+                if (enemy.x <= 0 || enemy.x + enemy.width >= canvas.width) {
+                    enemy.direction *= -1;
+                }
+                
+                // Check collision with player
+                if (
+                    player.x < enemy.x + enemy.width &&
+                    player.x + player.width > enemy.x &&
+                    player.y < enemy.y + enemy.height &&
+                    player.y + player.height > enemy.y
+                ) {
+                    // If player is above enemy, defeat enemy
+                    if (player.velocityY > 0 && player.y + player.height < enemy.y + enemy.height / 2) {
+                        enemy.x = -100; // Remove enemy temporarily
+                        player.velocityY = -10; // Bounce
+                        score += 100;
+                        updateScore();
+                    } else {
+                        loseLife();
+                        player.x = 50;
+                        player.y = 400;
+                        player.velocityY = 0;
+                    }
+                }
+            }
+            
+            // Check coin collisions
+            for (const coin of coins) {
+                if (
+                    !coin.collected &&
+                    player.x < coin.x + coin.width &&
+                    player.x + player.width > coin.x &&
+                    player.y < coin.y + coin.height &&
+                    player.y + player.height > coin.y
+                ) {
+                    coin.collected = true;
+                    score += 50;
+                    updateScore();
+                }
+            }
+            
+            // Check win condition
+            if (coins.every(coin => coin.collected)) {
+                winGame();
+            }
+        }
+        
+        function render() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw background
+            ctx.fillStyle = '#6B8CFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw platforms
+            ctx.fillStyle = '#8BC34A';
+            platforms.forEach(platform => {
+                ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                
+                // Platform top
+                ctx.fillStyle = '#7CB342';
+                ctx.fillRect(platform.x, platform.y, platform.width, 5);
+                ctx.fillStyle = '#8BC34A';
+            });
+            
+            // Draw coins
+            coins.forEach(coin => {
+                if (!coin.collected) {
+                    ctx.fillStyle = '#FFD700';
+                    ctx.beginPath();
+                    ctx.arc(coin.x + coin.width/2, coin.y + coin.height/2, coin.width/2, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = '#FFC400';
+                    ctx.beginPath();
+                    ctx.arc(coin.x + coin.width/2 - 3, coin.y + coin.height/2 - 3, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+            
+            // Draw enemies
+            enemies.forEach(enemy => {
+                ctx.fillStyle = '#FF5722';
+                ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+                
+                // Enemy eyes
+                ctx.fillStyle = 'white';
+                ctx.fillRect(enemy.x + 8, enemy.y + 10, 8, 8);
+                ctx.fillRect(enemy.x + 24, enemy.y + 10, 8, 8);
+                
+                ctx.fillStyle = 'black';
+                ctx.fillRect(enemy.x + 10, enemy.y + 12, 4, 4);
+                ctx.fillRect(enemy.x + 26, enemy.y + 12, 4, 4);
+            });
+            
+            // Draw player
+            ctx.fillStyle = '#FF0000';
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+            
+            // Player details
+            ctx.fillStyle = '#0066CC';
+            ctx.fillRect(player.x, player.y, player.width, 15); // Hat
+            
+            ctx.fillStyle = '#D35400';
+            ctx.fillRect(player.x + 5, player.y + 40, 10, 20); // Left arm
+            ctx.fillRect(player.x + 25, player.y + 40, 10, 20); // Right arm
+            
+            ctx.fillStyle = '#000';
+            ctx.fillRect(player.x + 5, player.y + player.height - 10, 10, 10); // Left foot
+            ctx.fillRect(player.x + 25, player.y + player.height - 10, 10, 10); // Right foot
+            
+            // Player face
+            ctx.fillStyle = '#000';
+            if (player.direction > 0) {
+                ctx.fillRect(player.x + 30, player.y + 20, 5, 5); // Right eye
+            } else {
+                ctx.fillRect(player.x + 5, player.y + 20, 5, 5); // Left eye
+            }
+        }
+        
+        function updateScore() {
+            scoreElement.textContent = score;
+        }
+        
+        function updateLives() {
+            livesElement.textContent = lives;
+        }
+        
+        function loseLife() {
+            lives--;
+            updateLives();
+            
+            if (lives <= 0) {
+                gameOver();
+            }
+        }
+        
+        function gameOver() {
+            gameRunning = false;
+            startScreen.style.display = 'flex';
+            startButton.textContent = 'Try Again';
+            document.querySelector('h1').textContent = 'Game Over!';
+            document.querySelector('.instructions').innerHTML = `<p>Your Score: ${score}</p><p>Press the button to play again</p>`;
+        }
+        
+        function winGame() {
+            gameRunning = false;
+            startScreen.style.display = 'flex';
+            startButton.textContent = 'Play Again';
+            document.querySelector('h1').textContent = 'You Win!';
+            document.querySelector('.instructions').innerHTML = `<p>Congratulations! Your Score: ${score}</p><p>Press the button to play again</p>`;
+        }
+    </script>
+</body>
+</html>
